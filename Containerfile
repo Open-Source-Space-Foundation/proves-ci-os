@@ -2,6 +2,48 @@
 # renovate: datasource=docker depName=quay.io/fedora/fedora-bootc
 ARG BASE_IMAGE=quay.io/fedora/fedora-bootc:44@sha256:c24cce42b92975040c0a725c7eef9d6c3bd6f3de4165d947dcd4dff4ab57c3ab
 
+# renovate: datasource=docker depName=golang
+ARG GOLANG_IMAGE=golang:1.26@sha256:52d57e3542f28ad72e9a1084e209366d8ca6af04997636134c138d16702a70a6
+# Raspberry Pi OpenOCD fork, `git describe` sdk-2.2.0-2-gcd4873400 (ADR 0007).
+# renovate: datasource=git-refs depName=https://github.com/raspberrypi/openocd
+ARG OPENOCD_REF=cd4873400
+# renovate: datasource=git-refs depName=https://github.com/dj-on-github/korad_control
+ARG KORAD_CONTROL_REF=ed806d8
+
+# Go toolchain lives only here; the final image gets the static binaries.
+FROM ${GOLANG_IMAGE} AS gobuild
+WORKDIR /src
+COPY go.mod ./
+COPY cmd/ cmd/
+COPY internal/ internal/
+RUN CGO_ENABLED=0 go build -trimpath -o /out/ ./cmd/proves-runner ./cmd/proves-update
+
+# Build-only packages stay in this stage (ADR 0007).
+FROM ${BASE_IMAGE} AS hil
+ARG OPENOCD_REF
+ARG KORAD_CONTROL_REF
+RUN dnf -y install --setopt=install_weak_deps=False \
+      git gcc make autoconf automake libtool pkgconf-pkg-config texinfo \
+      libusb1-devel hidapi-devel jimtcl-devel python3.13 \
+    && dnf clean all
+WORKDIR /build/openocd
+RUN git clone https://github.com/raspberrypi/openocd . \
+    && git checkout "${OPENOCD_REF}" \
+    && ./bootstrap \
+    && ./configure --prefix=/usr/local --enable-cmsis-dap --disable-werror \
+    && make -j"$(nproc)" \
+    && make install DESTDIR=/out \
+    && install -Dm644 contrib/60-openocd.rules /out/usr/lib/udev/rules.d/60-openocd.rules
+# The venv is built at its final path; its interpreter is the same python3.13
+# RPM the final image installs. Workflows run ~/korad_control/.venv/bin/python.
+RUN git clone https://github.com/dj-on-github/korad_control /usr/local/lib/korad_control \
+    && git -C /usr/local/lib/korad_control checkout "${KORAD_CONTROL_REF}" \
+    && rm -rf /usr/local/lib/korad_control/.git \
+    && python3.13 -m venv /usr/local/lib/korad_control/.venv \
+    && /usr/local/lib/korad_control/.venv/bin/pip install --no-cache-dir \
+         pyserial==3.5 pyyaml==6.0.3 future==1.0.0 iso8601==2.1.0 \
+    && /usr/local/lib/korad_control/.venv/bin/python /usr/local/lib/korad_control/korad_control.py --help
+
 FROM ${BASE_IMAGE}
 
 # Tailscale is not in Fedora; use its stable repo (ADR 0005).
@@ -16,12 +58,15 @@ RUN dnf -y install --setopt=install_weak_deps=False \
       git make cmake gcc gcc-c++ curl psmisc lsof procps-ng usbutils jq screen \
       tailscale NetworkManager \
       lttng-ust openssl-libs krb5-libs zlib-ng-compat libicu \
-      libusb1 hidapi python3.13 \
+      libusb1 hidapi jimtcl python3.13 \
     && test -z "$(rpm -qa ModemManager NetworkManager-wifi wpa_supplicant)" \
     && dnf clean all \
     && rm -rf /var/cache/dnf /var/lib/dnf/repos
 
 COPY files/ /
+COPY --from=gobuild /out/ /usr/bin/
+COPY --from=hil /out/usr/ /usr/
+COPY --from=hil /usr/local/lib/korad_control/ /usr/local/lib/korad_control/
 
 # ops and runner come from sysusers.d (ADR 0005); run it now so the accounts
 # exist in the built image, not just after first boot. dialout lives in

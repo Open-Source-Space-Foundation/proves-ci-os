@@ -1,0 +1,56 @@
+schemaVersion: "2.0.0"
+
+# ADR 0007: source-built HIL toolchain and its paths.
+commandTests:
+  - name: openocd is installed and runs
+    command: /usr/local/bin/openocd
+    args: ["--version"]
+    expectedError: ["Open On-Chip Debugger"]
+  - name: openocd symlink under the runner home resolves
+    command: test
+    args: ["-x", "/var/lib/runner/openocd/src/openocd"]
+    setup: [["systemd-tmpfiles", "--create"]]
+  - name: openocd tcl symlink resolves
+    command: test
+    args: ["-d", "/var/lib/runner/openocd/tcl/target"]
+    setup: [["systemd-tmpfiles", "--create"]]
+  - name: korad_control symlink resolves
+    command: test
+    args: ["-f", "/var/lib/runner/korad_control/korad_control.py"]
+    setup: [["systemd-tmpfiles", "--create"]]
+  - name: korad_control venv runs on python3.13
+    command: /usr/local/lib/korad_control/.venv/bin/python
+    args: ["-c", "import sys, serial, yaml; assert sys.version_info[:2] == (3, 13)"]
+  - name: proves-runner is a static binary
+    command: sh
+    args: ["-c", "! ldd /usr/bin/proves-runner 2>&1 | grep -q 'libc.so'"]
+  - name: proves-update is a static binary
+    command: sh
+    args: ["-c", "! ldd /usr/bin/proves-update 2>&1 | grep -q 'libc.so'"]
+  - name: go toolchain is not in the image
+    command: sh
+    args: ["-c", "! command -v go"]
+
+fileExistenceTests:
+  - name: openocd udev rules use plugdev
+    path: /usr/lib/udev/rules.d/60-openocd.rules
+    shouldExist: true
+  - name: board symlink rules
+    path: /usr/lib/udev/rules.d/99-proves-hil.rules
+    shouldExist: true
+  - name: proves-runner
+    path: /usr/bin/proves-runner
+    shouldExist: true
+    permissions: "-rwxr-xr-x"
+  - name: proves-update
+    path: /usr/bin/proves-update
+    shouldExist: true
+    permissions: "-rwxr-xr-x"
+
+fileContentTests:
+  - name: openocd rules grant plugdev
+    path: /usr/lib/udev/rules.d/60-openocd.rules
+    expectedContents: ['GROUP="plugdev"']
+  - name: HIL rules match all three ports
+    path: /usr/lib/udev/rules.d/99-proves-hil.rules
+    expectedContents: ["ttyBOARD", "ttyPWR", "ttyDBG"]

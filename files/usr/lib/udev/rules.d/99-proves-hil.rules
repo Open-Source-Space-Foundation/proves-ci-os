@@ -1,0 +1,4 @@
+# Stable names for flight-board hardware, matched by VID:PID (ADR 0007).
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0028", ATTRS{idProduct}=="000f", SYMLINK+="ttyBOARD"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0416", ATTRS{idProduct}=="5011", SYMLINK+="ttyPWR"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="000c", SYMLINK+="ttyDBG"
