@@ -18,8 +18,8 @@ import (
 	"github.com/open-source-space-foundation/proves-ci-os/internal/update"
 )
 
-// runnerUnit is the Runner service installed by the runner ticket.
-const runnerUnit = "proves-runner.service"
+// runnerUnit is the Runner service in files/usr/lib/systemd/system.
+const runnerUnit = "actions-runner.service"
 
 // Upper bounds on a single command, so a hung bootc cannot hold the timer
 // service forever. The stop bound covers the unit's own five-minute timeout.
