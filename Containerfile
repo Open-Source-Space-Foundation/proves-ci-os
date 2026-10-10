@@ -74,7 +74,8 @@ COPY --from=hil /usr/local/lib/korad_control/ /usr/local/lib/korad_control/
 RUN systemd-sysusers \
     && grep '^dialout:' /usr/lib/group >> /etc/group \
     && usermod -aG dialout ops \
-    && systemctl disable sshd.service \
+    && systemctl disable sshd.service bootc-fetch-apply-updates.timer \
+    && systemctl enable proves-update.timer \
     && ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
     && echo 'LANG=en_US.UTF-8' > /etc/locale.conf
 

@@ -1,0 +1,10 @@
+[Unit]
+Description=Stage the latest Image and reboot when the Runner is idle
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/proves-update
+# ADR 0006: wait at most 72 hours for an idle Runner, plus time to stage and stop.
+TimeoutStartSec=73h

@@ -31,6 +31,18 @@ commandTests:
     command: sh
     args: ["-c", "! command -v go"]
 
+  - name: proves-update timer is enabled
+    command: systemctl
+    args: ["is-enabled", "proves-update.timer"]
+    expectedOutput: ["enabled"]
+  - name: stock auto-reboot timer is not enabled
+    command: sh
+    args: ["-c", "! systemctl is-enabled bootc-fetch-apply-updates.timer"]
+  - name: update timer calendar is valid
+    command: systemd-analyze
+    args: ["calendar", "Mon *-*-* 09:00:00 UTC"]
+    expectedOutput: ["Normalized form"]
+
 fileExistenceTests:
   - name: openocd udev rules use plugdev
     path: /usr/lib/udev/rules.d/60-openocd.rules
