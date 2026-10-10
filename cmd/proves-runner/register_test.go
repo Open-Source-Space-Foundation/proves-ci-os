@@ -79,6 +79,7 @@ func TestMergeEnv(t *testing.T) {
 		{"A=1\nB=2\n", "A=1\n", "A=1\nB=2\n"},
 		{"A=1\n", "A=1\nC=3\n", "A=1\nC=3\n"},
 		{"B=2\n", "A=1", "A=1\nB=2\n"},
+		{"PATH=/old\nB=2\n", "PATH=/new\n", "PATH=/new\nB=2\n"},
 	}
 	for _, c := range cases {
 		if got := mergeEnv(c.before, c.after); got != c.want {
@@ -170,8 +171,29 @@ func TestRegisterReplaceDropsLocalRegistration(t *testing.T) {
 	if err := register(context.Background(), dir, o, "TOK", rec.run, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(rec.calls[0].args, "--replace") {
-		t.Fatalf("args = %v", rec.calls[0].args)
+	if !slices.Equal(rec.calls[0].args, []string{"systemctl", "stop", service}) || !slices.Contains(rec.calls[1].args, "--replace") {
+		t.Fatalf("calls = %+v", rec.calls)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, ".credentials.replaced")); err == nil {
+		t.Fatal("old credentials left behind after a successful replace")
+	}
+}
+
+func TestRegisterReplaceRestoresRegistrationOnFailure(t *testing.T) {
+	dir := seeded(t, map[string]string{".runner": "r", ".credentials": "c"})
+	rec := &recorder{onRun: func(c cmdSpec) error {
+		if c.asRunner {
+			return errors.New("expired token")
+		}
+		return nil
+	}}
+	o := opts()
+	o.replace = true
+	if err := register(context.Background(), dir, o, "TOK", rec.run, &bytes.Buffer{}); err == nil {
+		t.Fatal("want error")
+	}
+	if read(t, filepath.Join(dir, ".runner")) != "r" || read(t, filepath.Join(dir, ".credentials")) != "c" {
+		t.Fatal("registration not restored")
 	}
 }
 

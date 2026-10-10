@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 )
 
@@ -147,13 +146,23 @@ func configEnv(token string) []string {
 	return []string{"PATH=" + jobPath, "LANG=C.UTF-8", "HOME=" + filepath.Dir(runnerDir), tokenEnv + "=" + token}
 }
 
-// mergeEnv returns after plus any non-empty line of before that after lacks,
-// so additions made to .env by hand or by the image survive config.sh.
+// envKey is the name before the first "=", or the whole line when it has none.
+func envKey(line string) string {
+	k, _, _ := strings.Cut(line, "=")
+	return k
+}
+
+// mergeEnv returns after plus any non-empty line of before whose key after
+// lacks, so additions made to .env by hand or by the image survive config.sh.
+// Keys present in after win: they hold the value config.sh just wrote.
 func mergeEnv(before, after string) string {
-	have := strings.Split(after, "\n")
+	have := map[string]bool{}
+	for line := range strings.SplitSeq(after, "\n") {
+		have[envKey(line)] = true
+	}
 	out := after
 	for line := range strings.SplitSeq(before, "\n") {
-		if line == "" || slices.Contains(have, line) {
+		if line == "" || have[envKey(line)] {
 			continue
 		}
 		if out != "" && !strings.HasSuffix(out, "\n") {
@@ -203,17 +212,24 @@ func register(ctx context.Context, dir string, o registerOpts, token string, run
 	if err != nil {
 		return err
 	}
+	restore := func() error { return nil }
 	if o.replace {
+		// Stop first so the old session does not outlive its credentials.
+		if err := run(ctx, cmdSpec{args: []string{"systemctl", "stop", service}}); err != nil {
+			return fmt.Errorf("systemctl stop: %w", err)
+		}
 		// config.sh refuses to run over an existing registration, and --replace
-		// only takes over the name on the server side, so drop the local state.
-		for _, f := range []string{".runner", ".credentials", ".credentials_rsaparams"} {
-			if err := os.Remove(filepath.Join(dir, f)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return err
-			}
+		// only takes over the name on the server side, so move the local state
+		// aside; it comes back if config.sh fails.
+		if restore, err = stashRegistration(dir); err != nil {
+			return err
 		}
 	}
 	if err := run(ctx, cmdSpec{args: configureArgs(o), env: configEnv(token), dir: dir, asRunner: true}); err != nil {
-		return fmt.Errorf("config.sh: %w", err)
+		return errors.Join(fmt.Errorf("config.sh: %w", err), restore())
+	}
+	if err := discardStash(dir); err != nil {
+		return err
 	}
 	after, err := readOptional(envPath)
 	if err != nil {
@@ -254,4 +270,41 @@ func unregister(ctx context.Context, dir, token string, run runFn, out io.Writer
 	}
 	_, err = fmt.Fprintln(out, "unregistered")
 	return err
+}
+
+// discardStash deletes the old registration once its replacement exists.
+func discardStash(dir string) error {
+	var errs []error
+	for _, f := range registrationFiles {
+		if err := os.Remove(filepath.Join(dir, f+".replaced")); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+var registrationFiles = []string{".runner", ".credentials", ".credentials_rsaparams"}
+
+// stashRegistration renames the registration files to *.replaced and returns a
+// function that renames them back. Files that do not exist are skipped.
+func stashRegistration(dir string) (restore func() error, err error) {
+	var moved []string
+	undo := func() error {
+		var errs []error
+		for _, f := range moved {
+			errs = append(errs, os.Rename(filepath.Join(dir, f+".replaced"), filepath.Join(dir, f)))
+		}
+		return errors.Join(errs...)
+	}
+	for _, f := range registrationFiles {
+		err := os.Rename(filepath.Join(dir, f), filepath.Join(dir, f+".replaced"))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, errors.Join(err, undo())
+		}
+		moved = append(moved, f)
+	}
+	return undo, nil
 }
