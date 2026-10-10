@@ -1,0 +1,3 @@
+docker:
+  ghcr.io/open-source-space-foundation/proves-ci-os:
+    use-sigstore-attachments: true

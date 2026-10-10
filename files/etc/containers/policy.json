@@ -1,0 +1,15 @@
+{
+  "default": [{ "type": "insecureAcceptAnything" }],
+  "transports": {
+    "docker": {
+      "ghcr.io/open-source-space-foundation/proves-ci-os": [
+        {
+          "type": "sigstoreSigned",
+          "keyPath": "/etc/pki/containers/proves-ci-os.pub",
+          "signedIdentity": { "type": "matchRepository" }
+        }
+      ]
+    },
+    "docker-daemon": { "": [{ "type": "insecureAcceptAnything" }] }
+  }
+}
