@@ -1,0 +1,56 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "pinDigests": true,
+  "enabledManagers": [
+    "dockerfile",
+    "github-actions",
+    "pre-commit",
+    "nix",
+    "gomod",
+    "custom.regex"
+  ],
+  "packageRules": [
+    {
+      "description": "Propose the next Fedora only after general availability; raise this cap by hand.",
+      "matchPackageNames": ["quay.io/fedora/fedora-bootc"],
+      "allowedVersions": "<=44"
+    },
+    {
+      "description": "Non-major updates merge once CI passes.",
+      "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "Major updates need a human.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "Raspberry Pi OpenOCD fork ref (ADR 0007).",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)Containerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG OPENOCD_REF=(?<currentDigest>\\S+)"
+      ]
+    },
+    {
+      "description": "korad_control upstream commit (ADR 0007).",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)Containerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG KORAD_CONTROL_REF=(?<currentDigest>\\S+)"
+      ]
+    },
+    {
+      "description": "Runner seed tarball version and sha256 (ADR 0004).",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)Containerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG RUNNER_VERSION=(?<currentValue>\\S+)\\nARG RUNNER_SHA256=(?<currentDigest>\\S+)"
+      ]
+    }
+  ]
+}
