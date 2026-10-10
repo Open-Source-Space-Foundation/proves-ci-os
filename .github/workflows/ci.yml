@@ -117,13 +117,13 @@ jobs:
       - name: Verify with only the baked policy
         run: |
           set -euo pipefail
-          docker run --rm \
+          docker run --rm --entrypoint skopeo \
             -v "$PWD/files/etc/containers/policy.json:/etc/containers/policy.json:ro" \
             -v "$PWD/files/etc/containers/registries.d:/etc/containers/registries.d:ro" \
             -v "$PWD/files/etc/pki/containers/proves-ci-os.pub:/etc/pki/containers/proves-ci-os.pub:ro" \
             -v "$RUNNER_TEMP/docker/config.json:/auth.json:ro" \
             "$SKOPEO_IMAGE" \
-            skopeo copy --authfile /auth.json "docker://$IMAGE_REPO@$IMAGE_DIGEST" dir:/tmp/verified
+            copy --authfile /auth.json "docker://$IMAGE_REPO@$IMAGE_DIGEST" dir:/tmp/verified
       # Only a signed and verified digest gets the moving tags.
       - name: Move latest and the date tag
         run: |
