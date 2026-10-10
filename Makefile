@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help fmt build test check-renovate iso all
+.PHONY: help fmt build test structure-test check-renovate iso all
 
 IMAGE ?= proves-ci-os:dev
 
@@ -15,6 +15,11 @@ build: ## Build the Image with podman (CI is the authoritative build)
 test: ## Run Go tests
 	go test ./...
 
+structure-test: ## Run container-structure-test against $(IMAGE) (loaded into docker)
+	podman save $(IMAGE) | docker load
+	container-structure-test test --image localhost/$(IMAGE) --platform linux/amd64 \
+		$(foreach f,$(wildcard tests/structure/*.yaml),--config $(f))
+
 check-renovate: ## Assert every pinned ARG has one manager and validate renovate.json
 	go run ./cmd/check-renovate-pins
 	renovate-config-validator --strict
@@ -22,4 +27,4 @@ check-renovate: ## Assert every pinned ARG has one manager and validate renovate
 iso: ## Build the installer ISO (see ADR 0008)
 	@echo "iso target not implemented yet" >&2; exit 1
 
-all: fmt build test check-renovate ## Everything except iso
+all: fmt build test structure-test check-renovate ## Everything except iso
