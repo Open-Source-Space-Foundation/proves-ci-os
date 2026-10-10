@@ -4,7 +4,7 @@ This repository defines the PROVES CI machine Image. The decisions behind it are
 
 ## Dev shell
 
-Dependencies come from Nix. With [Nix](https://nixos.org/download/) and [direnv](https://direnv.net/) installed, `cd` into the repository and run `direnv allow`; otherwise run `nix develop`. The shell provides `gnumake`, `hadolint`, `container-structure-test`, `pre-commit`, `go`, `golangci-lint`, `cosign`, `skopeo`, `renovate`, `rumdl` and `codespell`, and installs the git hooks on entry. `podman` is installed separately (a Linux VM on macOS).
+Dependencies come from Nix. With [Nix](https://nixos.org/download/) and [direnv](https://direnv.net/) installed, `cd` into the repository and run `direnv allow`; otherwise run `nix develop`. The shell provides `gnumake`, `hadolint`, `container-structure-test`, `pre-commit`, `go`, `golangci-lint`, `cosign`, `skopeo`, `oras`, `renovate`, `rumdl` and `codespell`, and installs the git hooks on entry. `podman` is installed separately (a Linux VM on macOS).
 
 Commit from inside the shell: the hooks run tools it provides.
 
