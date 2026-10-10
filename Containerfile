@@ -6,7 +6,7 @@ ARG BASE_IMAGE=quay.io/fedora/fedora-bootc:44@sha256:c24cce42b92975040c0a725c7ee
 ARG GOLANG_IMAGE=golang:1.27@sha256:e432b43af23a9328d56a7c499be0476810aa344acbcf65fc7c455d4ff5a40602
 # Raspberry Pi OpenOCD fork, `git describe` sdk-2.2.0-2-gcd4873400 (ADR 0007).
 # renovate: datasource=git-refs depName=https://github.com/raspberrypi/openocd
-ARG OPENOCD_REF=cd4873400
+ARG OPENOCD_REF=acff23ffd100479d6481a1155123774b79a990b9
 # renovate: datasource=git-refs depName=https://github.com/dj-on-github/korad_control
 ARG KORAD_CONTROL_REF=ed806d8
 # Runner seed tarball, x86_64 only for now (ADR 0004). The sha256 is from the
