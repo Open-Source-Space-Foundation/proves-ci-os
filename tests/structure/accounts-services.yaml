@@ -1,0 +1,41 @@
+schemaVersion: "2.0.0"
+
+# ADR 0001, 0005: accounts, sshd and ModemManager.
+commandTests:
+  - name: sshd.service is disabled
+    command: systemctl
+    args: ["is-enabled", "sshd.service"]
+    expectedOutput: ["disabled"]
+    exitCode: 1
+  - name: ModemManager is absent
+    command: sh
+    args: ["-c", "test -z \"$(rpm -qa ModemManager)\""]
+  - name: no Wi-Fi packages
+    command: sh
+    args: ["-c", "test -z \"$(rpm -qa NetworkManager-wifi wpa_supplicant)\""]
+  - name: ops is a wheel member with the access groups
+    command: sh
+    args:
+      - -c
+      - |
+        test "$(id -Gn ops | tr ' ' '\n' | grep -cxE 'wheel|dialout|plugdev|systemd-journal|runner')" = 5
+  - name: ops has a login shell
+    command: sh
+    args: ["-c", "test \"$(getent passwd ops | cut -d: -f7)\" = /bin/bash"]
+  - name: runner cannot log in
+    command: sh
+    args: ["-c", "test \"$(getent passwd runner | cut -d: -f7)\" = /usr/sbin/nologin"]
+  - name: runner is not in wheel
+    command: sh
+    args: ["-c", "! id -Gn runner | tr ' ' '\\n' | grep -qx wheel"]
+  - name: no baked password on ops or runner
+    command: sh
+    args:
+      - -c
+      - |
+        test "$(getent shadow ops runner | cut -d: -f2 | grep -cvE '^(!!?|\*|!\*)$')" = 0
+
+fileContentTests:
+  - name: sysusers.d declares plugdev, runner and ops
+    path: /usr/lib/sysusers.d/zz-proves-ci-os.conf
+    expectedContents: ["g plugdev", "u runner", "/usr/sbin/nologin", "u ops", "m ops wheel"]

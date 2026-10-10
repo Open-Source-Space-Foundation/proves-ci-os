@@ -1,0 +1,34 @@
+schemaVersion: "2.0.0"
+
+# ADR 0004: runner seed, units and proves-runner.
+fileExistenceTests:
+  - name: seed tarball
+    path: /usr/lib/proves-ci-os/actions-runner.tar.gz
+    shouldExist: true
+  - name: actions-runner unit
+    path: /usr/lib/systemd/system/actions-runner.service
+    shouldExist: true
+  - name: actions-runner-seed unit
+    path: /usr/lib/systemd/system/actions-runner-seed.service
+    shouldExist: true
+  - name: proves-runner executable
+    path: /usr/bin/proves-runner
+    shouldExist: true
+    permissions: "-rwxr-xr-x"
+
+fileContentTests:
+  - name: runner unit skips an unregistered machine
+    path: /usr/lib/systemd/system/actions-runner.service
+    expectedContents: ["ConditionPathExists=/var/lib/runner/actions-runner/\\.runner", "User=runner"]
+  - name: seed unit runs once as runner
+    path: /usr/lib/systemd/system/actions-runner-seed.service
+    expectedContents: ["ConditionPathExists=!/var/lib/runner/actions-runner/config\\.sh", "User=runner"]
+
+commandTests:
+  - name: runner and seed units are enabled
+    command: systemctl
+    args: ["is-enabled", "actions-runner.service", "actions-runner-seed.service"]
+    expectedOutput: ["enabled"]
+  - name: seed tarball is a readable gzip archive
+    command: tar
+    args: ["-tzf", "/usr/lib/proves-ci-os/actions-runner.tar.gz", "./config.sh"]

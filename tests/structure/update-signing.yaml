@@ -1,0 +1,46 @@
+schemaVersion: "2.0.0"
+
+# ADR 0003, 0006: proves-update and signature verification.
+fileExistenceTests:
+  - name: proves-update executable
+    path: /usr/bin/proves-update
+    shouldExist: true
+    permissions: "-rwxr-xr-x"
+  - name: proves-update timer
+    path: /usr/lib/systemd/system/proves-update.timer
+    shouldExist: true
+  - name: proves-update service
+    path: /usr/lib/systemd/system/proves-update.service
+    shouldExist: true
+  - name: cosign public key
+    path: /etc/pki/containers/proves-ci-os.pub
+    shouldExist: true
+  - name: containers policy
+    path: /etc/containers/policy.json
+    shouldExist: true
+  - name: registries.d entry
+    path: /etc/containers/registries.d/proves-ci-os.yaml
+    shouldExist: true
+
+fileContentTests:
+  - name: public key is a public key
+    path: /etc/pki/containers/proves-ci-os.pub
+    expectedContents: ["BEGIN PUBLIC KEY"]
+    excludedContents: ["PRIVATE KEY"]
+  - name: policy requires sigstore signatures for the image repo
+    path: /etc/containers/policy.json
+    expectedContents: ["sigstoreSigned", "ghcr.io/open-source-space-foundation/proves-ci-os", "/etc/pki/containers/proves-ci-os\\.pub"]
+  - name: registries.d reads sigstore attachments
+    path: /etc/containers/registries.d/proves-ci-os.yaml
+    expectedContents: ["use-sigstore-attachments: true"]
+
+commandTests:
+  - name: update timer is enabled
+    command: systemctl
+    args: ["is-enabled", "proves-update.timer"]
+    expectedOutput: ["enabled"]
+  - name: stock bootc update timer is disabled
+    command: systemctl
+    args: ["is-enabled", "bootc-fetch-apply-updates.timer"]
+    expectedOutput: ["disabled"]
+    exitCode: 1
