@@ -82,6 +82,7 @@ func TestParseManagersFailsClosed(t *testing.T) {
 		"invalid json":      `{`,
 		"glob file pattern": `{"customManagers":[{"customType":"regex","managerFilePatterns":["Containerfile"],"matchStrings":["x"]}]}`,
 		"bad regex":         `{"customManagers":[{"customType":"regex","managerFilePatterns":["/x/"],"matchStrings":["("]}]}`,
+		"no file patterns":  `{"customManagers":[{"customType":"regex","matchStrings":["x"]}]}`,
 		"no matchStrings":   `{"customManagers":[{"customType":"regex","managerFilePatterns":["/x/"]}]}`,
 	}
 	for name, cfg := range bad {

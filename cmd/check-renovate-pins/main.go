@@ -57,6 +57,9 @@ func parseManagers(config []byte) ([]manager, error) {
 		if len(cm.MatchStrings) == 0 {
 			return nil, fmt.Errorf("customManagers[%d]: no matchStrings", i)
 		}
+		if len(cm.ManagerFilePatterns) == 0 {
+			return nil, fmt.Errorf("customManagers[%d]: no managerFilePatterns", i)
+		}
 		m := manager{}
 		for _, p := range cm.ManagerFilePatterns {
 			re, err := compileFilePattern(p)
@@ -119,7 +122,7 @@ func imageArgs(containerfile string) map[string]bool {
 // covers reports whether any of m's matchStrings, applied to content,
 // produces a match overlapping the byte span of a.
 func (m manager) covers(path, content string, a arg) bool {
-	applies := len(m.filePatterns) == 0
+	applies := false
 	for _, p := range m.filePatterns {
 		applies = applies || p.MatchString(path)
 	}
