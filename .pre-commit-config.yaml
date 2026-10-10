@@ -1,0 +1,44 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: detect-private-key
+  # Tools come from the Nix dev shell, so these run as system hooks.
+  - repo: local
+    hooks:
+      - id: hadolint
+        name: hadolint
+        entry: hadolint
+        language: system
+        files: (^|/)Containerfile[^/]*$
+      - id: golangci-lint
+        name: golangci-lint (go vet)
+        entry: golangci-lint run --fix
+        language: system
+        types: [go]
+        pass_filenames: false
+      - id: gofumpt
+        name: gofumpt
+        entry: golangci-lint fmt
+        language: system
+        types: [go]
+        pass_filenames: false
+      - id: rumdl
+        name: rumdl
+        entry: rumdl check
+        language: system
+        types: [markdown]
+      - id: codespell
+        name: codespell
+        entry: codespell
+        language: system
+        types: [text]
+      - id: renovate-config-validator
+        name: renovate-config-validator
+        entry: renovate-config-validator --strict
+        language: system
+        files: ^renovate\.json$
+        pass_filenames: false
