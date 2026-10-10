@@ -1,0 +1,45 @@
+# syntax=docker/dockerfile:1
+# Installer environment for the ISO (ADR 0008). image-builder turns this
+# container into the ISO's live root; it is not the Image that gets installed.
+# Adapted from the osbuild/image-builder "Generic ISO" example.
+# renovate: datasource=docker depName=quay.io/fedora/fedora-bootc
+FROM quay.io/fedora/fedora-bootc:44@sha256:c24cce42b92975040c0a725c7eef9d6c3bd6f3de4165d947dcd4dff4ab57c3ab
+
+RUN dnf -y install --setopt=install_weak_deps=False \
+      anaconda anaconda-install-img-deps anaconda-dracut \
+      dracut-config-generic dracut-network net-tools \
+      grub2-efi-x64-cdboot grub2-pc-modules plymouth \
+      default-fonts-core-sans default-fonts-other-sans \
+      xorrisofs squashfs-tools \
+    && dnf clean all
+
+# image-builder expects the EFI binaries under /boot/efi.
+RUN mkdir -p /boot/efi && cp -ra /usr/lib/efi/*/*/EFI /boot/efi
+
+COPY iso.yaml /usr/lib/image-builder/bootc/iso.yaml
+# Partial on purpose: Anaconda prompts for what is missing (password, hostname, disk).
+COPY interactive-defaults.ks /usr/share/anaconda/interactive-defaults.ks
+
+# What lorax normally does to make Anaconda run as the live root.
+RUN echo "install:x:0:0:root:/root:/usr/libexec/anaconda/run-anaconda" >> /etc/passwd \
+    && echo "install::14438:0:99999:7:::" >> /etc/shadow \
+    && passwd -d root
+RUN mv /usr/share/anaconda/list-harddrives-stub /usr/bin/list-harddrives \
+    && mv /etc/yum.repos.d /etc/anaconda.repos.d \
+    && ln -s /lib/systemd/system/anaconda.target /etc/systemd/system/default.target \
+    && rm -v /usr/lib/systemd/system-generators/systemd-gpt-auto-generator
+RUN ln -s /usr/lib/systemd/system/anaconda-shell@.service /usr/lib/systemd/system/autovt@.service \
+    && mkdir -p /usr/lib/systemd/logind.conf.d \
+    && printf '[Login]\nReserveVT=2\n' > /usr/lib/systemd/logind.conf.d/anaconda-shell.conf
+
+# --no-hostonly so the initramfs carries NIC drivers such as tg3 for the Mac mini.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN mkdir "$(realpath /root)" \
+    && kernel=$(kernel-install list --json pretty | jq -r '.[] | select(.has_kernel == true) | .version') \
+    && DRACUT_NO_XATTR=1 dracut --force -v --zstd --reproducible --no-hostonly \
+         --add "anaconda" "/usr/lib/modules/${kernel}/initramfs.img" "${kernel}"
+
+RUN for unit in service socket; do \
+      mkdir -p "/etc/systemd/user/pipewire.${unit}.d" \
+      && printf '[Unit]\nConditionUser=\n' > "/etc/systemd/user/pipewire.${unit}.d/allowroot.conf"; \
+    done

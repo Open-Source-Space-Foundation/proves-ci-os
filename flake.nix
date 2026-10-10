@@ -26,6 +26,7 @@
             golangci-lint
             cosign
             skopeo
+            oras
             renovate
             rumdl
             codespell

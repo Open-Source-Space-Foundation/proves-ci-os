@@ -24,7 +24,13 @@ check-renovate: ## Assert every pinned ARG has one manager and validate renovate
 	go run ./cmd/check-renovate-pins
 	renovate-config-validator --strict
 
-iso: ## Build the installer ISO (see ADR 0008)
-	@echo "iso target not implemented yet" >&2; exit 1
+ISO_PAYLOAD ?= ghcr.io/open-source-space-foundation/proves-ci-os:latest
+
+iso: ## Build the installer ISO into ./out (needs root, podman and image-builder; see ADR 0008)
+	podman build -t localhost/proves-ci-os-installer -f iso/Containerfile iso
+	podman pull $(ISO_PAYLOAD)
+	image-builder build --bootc-ref localhost/proves-ci-os-installer \
+		--bootc-installer-payload-ref $(ISO_PAYLOAD) --bootc-default-fs ext4 \
+		--output-dir out --output-name proves-ci-os-installer bootc-generic-iso
 
 all: fmt build test structure-test check-renovate ## Everything except iso

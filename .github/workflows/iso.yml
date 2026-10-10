@@ -1,0 +1,98 @@
+name: ISO
+
+# Built on a release tag or by hand, not on every merge: installed machines
+# update themselves with bootc (ADR 0008).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iso-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_REPO: ghcr.io/open-source-space-foundation/proves-ci-os
+  # GitHub Release assets must be under 2 GiB.
+  RELEASE_ASSET_LIMIT: "2147483648"
+
+jobs:
+  iso:
+    # The org's self-hosted runners (ADR 0008). Assumes Linux with podman,
+    # dnf and passwordless sudo; image-builder needs root. Unproven until the
+    # first run, see issue #28.
+    runs-on: deathstar
+    timeout-minutes: 120
+    # Holds COSIGN_PRIVATE_KEY and COSIGN_PASSWORD (ADR 0003).
+    environment: release
+    permissions:
+      contents: write
+      packages: write
+    env:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+      REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - name: Install image-builder
+        run: sudo dnf -y install image-builder
+      # The ISO embeds this image, so embed only one that verifies against the baked key.
+      - name: Verify the payload signature
+        run: |
+          set -euo pipefail
+          nix develop -c cosign verify --key cosign.pub --insecure-ignore-tlog=true "$IMAGE_REPO:latest" >/dev/null
+      - name: Build the ISO
+        run: |
+          set -euo pipefail
+          sudo make iso
+          iso="$(ls out/proves-ci-os-installer*.iso)"
+          test "$(echo "$iso" | wc -l)" -eq 1
+          mv "$iso" out/proves-ci-os-installer.iso
+          (cd out && sha256sum proves-ci-os-installer.iso > proves-ci-os-installer.iso.sha256)
+          size="$(stat -c %s out/proves-ci-os-installer.iso)"
+          echo "ISO size: $size bytes" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "ISO_SIZE=$size" >> "$GITHUB_ENV"
+      - name: Sign the ISO
+        run: |
+          set -euo pipefail
+          nix develop -c cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY \
+            --tlog-upload=false --use-signing-config=false \
+            --output-signature out/proves-ci-os-installer.iso.sig out/proves-ci-os-installer.iso
+          nix develop -c cosign verify-blob --key cosign.pub --insecure-ignore-tlog=true \
+            --signature out/proves-ci-os-installer.iso.sig out/proves-ci-os-installer.iso
+      - name: Publish as a GitHub Release asset
+        if: github.ref_type == 'tag' && env.ISO_SIZE < env.RELEASE_ASSET_LIMIT
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" --verify-tag --notes "Installer ISO" 2>/dev/null \
+            || gh release view "$GITHUB_REF_NAME" >/dev/null
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            out/proves-ci-os-installer.iso out/proves-ci-os-installer.iso.sha256 \
+            out/proves-ci-os-installer.iso.sig
+      - name: Publish as an OCI artifact
+        if: github.ref_type == 'tag' && env.ISO_SIZE >= env.RELEASE_ASSET_LIMIT
+        run: |
+          set -euo pipefail
+          printf '%s' "$REGISTRY_TOKEN" | nix develop -c oras login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin
+          cd out
+          nix develop -c oras push "$IMAGE_REPO/installer-iso:$GITHUB_REF_NAME" \
+            --artifact-type application/vnd.proves-ci-os.installer-iso \
+            proves-ci-os-installer.iso:application/x-iso9660-image \
+            proves-ci-os-installer.iso.sha256:text/plain \
+            proves-ci-os-installer.iso.sig:text/plain
+      # Manual runs publish nothing; keep the files for inspection and measuring.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.ref_type != 'tag'
+        with:
+          name: installer-iso
+          path: out/
+          retention-days: 3
+          compression-level: 0
