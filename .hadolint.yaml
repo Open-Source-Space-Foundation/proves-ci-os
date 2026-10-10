@@ -1,1 +1,4 @@
 failure-threshold: warning
+ignored:
+  # RPMs are pinned by the base image digest, not per package (ADR 0001).
+  - DL3041
