@@ -1,0 +1,17 @@
+[Unit]
+Description=Seed the GitHub Actions runner into /var/lib/runner
+Documentation=file:///usr/share/doc/proves-ci-os/
+After=systemd-tmpfiles-setup.service
+# A finished seed is never redone; the runner updates itself after that (ADR 0004).
+ConditionPathExists=!/var/lib/runner/actions-runner/config.sh
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=runner
+Group=runner
+UMask=0027
+ExecStart=/usr/bin/proves-runner seed
+
+[Install]
+WantedBy=multi-user.target

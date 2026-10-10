@@ -9,6 +9,11 @@ ARG GOLANG_IMAGE=golang:1.26@sha256:52d57e3542f28ad72e9a1084e209366d8ca6af049976
 ARG OPENOCD_REF=cd4873400
 # renovate: datasource=git-refs depName=https://github.com/dj-on-github/korad_control
 ARG KORAD_CONTROL_REF=ed806d8
+# Runner seed tarball, x86_64 only for now (ADR 0004). The sha256 is from the
+# release notes and verified again at build time.
+# renovate: datasource=github-releases depName=actions/runner
+ARG RUNNER_VERSION=2.338.0
+ARG RUNNER_SHA256=af4b794c1bc41d73d40535e3fe092a39f9679cd8d965954c2aca25a05ca41d32
 
 # Go toolchain lives only here; the final image gets the static binaries.
 FROM ${GOLANG_IMAGE} AS gobuild
@@ -44,6 +49,15 @@ RUN git clone https://github.com/dj-on-github/korad_control /usr/local/lib/korad
          pyserial==3.5 pyyaml==6.0.3 future==1.0.0 iso8601==2.1.0 \
     && /usr/local/lib/korad_control/.venv/bin/python /usr/local/lib/korad_control/korad_control.py --help
 
+# The runner seed: downloaded and verified here, copied into the final image.
+FROM ${BASE_IMAGE} AS seed
+ARG RUNNER_VERSION
+ARG RUNNER_SHA256
+RUN curl -fsSL --retry 3 --max-time 600 -o /runner.tar.gz \
+      "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" \
+    && echo "${RUNNER_SHA256}  /runner.tar.gz" > /runner.sha256 \
+    && sha256sum -c /runner.sha256
+
 FROM ${BASE_IMAGE}
 
 # Tailscale is not in Fedora; use its stable repo (ADR 0005).
@@ -53,11 +67,12 @@ RUN curl -fsSL --retry 3 --max-time 60 \
 
 # Runtime packages only; build-only packages belong in the builder stage
 # (ADR 0007). No Wi-Fi packages: CI machines are wired (CONTEXT.md).
-# Runner .NET deps: lttng-ust openssl-libs krb5-libs zlib libicu.
+# Runner .NET deps: lttng-ust openssl-libs krb5-libs zlib libicu, plus ldd
+# (glibc-common), which config.sh checks for.
 RUN dnf -y install --setopt=install_weak_deps=False \
       git make cmake gcc gcc-c++ curl psmisc lsof procps-ng usbutils jq screen \
       tailscale NetworkManager \
-      lttng-ust openssl-libs krb5-libs zlib-ng-compat libicu \
+      lttng-ust openssl-libs krb5-libs zlib-ng-compat libicu glibc-common \
       libusb1 hidapi jimtcl python3.13 \
     && test -z "$(rpm -qa ModemManager NetworkManager-wifi wpa_supplicant)" \
     && dnf clean all \
@@ -65,6 +80,7 @@ RUN dnf -y install --setopt=install_weak_deps=False \
 
 COPY files/ /
 COPY --from=gobuild /out/ /usr/bin/
+COPY --from=seed /runner.tar.gz /usr/lib/proves-ci-os/actions-runner.tar.gz
 COPY --from=hil /out/usr/ /usr/
 COPY --from=hil /usr/local/lib/korad_control/ /usr/local/lib/korad_control/
 
@@ -75,7 +91,7 @@ RUN systemd-sysusers \
     && grep '^dialout:' /usr/lib/group >> /etc/group \
     && usermod -aG dialout ops \
     && systemctl disable sshd.service bootc-fetch-apply-updates.timer \
-    && systemctl enable proves-update.timer \
+    && systemctl enable proves-update.timer actions-runner-seed.service actions-runner.service \
     && ln -sf /usr/share/zoneinfo/UTC /etc/localtime \
     && echo 'LANG=en_US.UTF-8' > /etc/locale.conf
 

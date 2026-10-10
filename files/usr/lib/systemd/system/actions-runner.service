@@ -1,0 +1,27 @@
+[Unit]
+Description=GitHub Actions runner
+After=network-online.target actions-runner-seed.service
+Wants=network-online.target actions-runner-seed.service
+# An unregistered machine skips the unit instead of crash-looping; register with
+# `sudo proves-runner register` (ADR 0004).
+ConditionPathExists=/var/lib/runner/actions-runner/.runner
+StartLimitIntervalSec=10min
+StartLimitBurst=10
+
+[Service]
+User=runner
+Group=runner
+WorkingDirectory=/var/lib/runner/actions-runner
+# runsvc.sh is upstream's entry point: it loads .path and turns SIGTERM into SIGINT.
+ExecStart=/var/lib/runner/actions-runner/bin/runsvc.sh
+Restart=always
+RestartSec=10s
+# Let a running job finish on stop (upstream defaults).
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=5min
+# Group-readable so ops, in the runner group, can read logs without sudo.
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
