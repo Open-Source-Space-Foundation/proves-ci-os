@@ -14,8 +14,20 @@ repos:
         entry: hadolint
         language: system
         files: (^|/)Containerfile[^/]*$
+      - id: go-fix
+        name: go fix
+        entry: go fix ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+      - id: go-mod-tidy
+        name: go mod tidy
+        entry: go mod tidy
+        language: system
+        files: (\.go|^go\.(mod|sum))$
+        pass_filenames: false
       - id: golangci-lint
-        name: golangci-lint (go vet)
+        name: golangci-lint
         entry: golangci-lint run --fix
         language: system
         types: [go]
