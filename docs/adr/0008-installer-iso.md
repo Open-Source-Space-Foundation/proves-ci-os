@@ -4,7 +4,7 @@
 
 A Contributor installs a CI machine from an Anaconda ISO built by `image-builder` that embeds the Image and a baked kickstart, so install works offline once the wired link is up and does not depend on the registry. The installer wipes the whole internal disk and asks only for the `ops` console password (hashed, never published), the hostname (the default Runner name) and the target disk. The kickstart fixes the accounts, wired DHCP, the Image reference, locale and UTC.
 
-The ISO is trusted by a published checksum plus a cosign signature on the file. It is built on a release tag or manually, not on every merge, because installed machines update themselves with `bootc`. It is published as a GitHub Release asset if it fits 2 GiB, otherwise as a `ghcr.io` OCI artifact. The CI job that builds it runs on the organization's `deathstar` self-hosted runners (`runs-on: deathstar`), not GitHub-hosted ones.
+The ISO is trusted by a published checksum plus a cosign signature on the file. It is built on a release tag or manually, not on every merge, because installed machines update themselves with `bootc`. It is published as a GitHub Release asset if it fits 2 GiB, otherwise as a `ghcr.io` OCI artifact. The CI job that builds it runs on the organization's `deathstar` self-hosted runners (a `runs-on` of `group: deathstar` and the `Linux` and `X64` labels), not GitHub-hosted ones.
 
 ## Considered Options
 
