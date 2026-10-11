@@ -77,9 +77,12 @@ jobs:
         run: |
           set -euo pipefail
           sudo env REGISTRY_AUTH_FILE="$REGISTRY_AUTH_FILE" make iso
+          # The build ran as root; the checksum and signature steps run as the runner user.
+          sudo chown -R "$(id -u):$(id -g)" out
           iso="$(ls out/proves-ci-os-installer*.iso)"
           test "$(echo "$iso" | wc -l)" -eq 1
-          mv "$iso" out/proves-ci-os-installer.iso
+          # image-builder may already have used the final name.
+          [ "$iso" = out/proves-ci-os-installer.iso ] || mv "$iso" out/proves-ci-os-installer.iso
           (cd out && sha256sum proves-ci-os-installer.iso > proves-ci-os-installer.iso.sha256)
           size="$(stat -c %s out/proves-ci-os-installer.iso)"
           echo "ISO size: $size bytes" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -87,8 +90,9 @@ jobs:
       - name: Sign the ISO
         run: |
           set -euo pipefail
+          # cosign v3 defaults to the new bundle format; keep a plain .sig (as the Image's signature does).
           nix develop -c cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY \
-            --tlog-upload=false --use-signing-config=false \
+            --new-bundle-format=false --tlog-upload=false --use-signing-config=false \
             --output-signature out/proves-ci-os-installer.iso.sig out/proves-ci-os-installer.iso
           nix develop -c cosign verify-blob --key cosign.pub --insecure-ignore-tlog=true \
             --signature out/proves-ci-os-installer.iso.sig out/proves-ci-os-installer.iso
@@ -113,6 +117,11 @@ jobs:
             proves-ci-os-installer.iso:application/x-iso9660-image \
             proves-ci-os-installer.iso.sha256:text/plain \
             proves-ci-os-installer.iso.sig:text/plain
+      # The build runs as root. If it fails, root-owned files stay in the persistent workspace
+      # and the next run's checkout cannot clean it.
+      - name: Hand the workspace back to the runner user
+        if: always()
+        run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
       # Manual runs publish nothing; keep the files for inspection and measuring.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.ref_type != 'tag'
