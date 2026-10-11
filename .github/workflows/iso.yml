@@ -77,9 +77,12 @@ jobs:
         run: |
           set -euo pipefail
           sudo env REGISTRY_AUTH_FILE="$REGISTRY_AUTH_FILE" make iso
+          # The build ran as root; the checksum and signature steps run as the runner user.
+          sudo chown -R "$(id -u):$(id -g)" out
           iso="$(ls out/proves-ci-os-installer*.iso)"
           test "$(echo "$iso" | wc -l)" -eq 1
-          mv "$iso" out/proves-ci-os-installer.iso
+          # image-builder may already have used the final name.
+          [ "$iso" = out/proves-ci-os-installer.iso ] || mv "$iso" out/proves-ci-os-installer.iso
           (cd out && sha256sum proves-ci-os-installer.iso > proves-ci-os-installer.iso.sha256)
           size="$(stat -c %s out/proves-ci-os-installer.iso)"
           echo "ISO size: $size bytes" | tee -a "$GITHUB_STEP_SUMMARY"
