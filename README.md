@@ -23,7 +23,7 @@ You need an x86_64 UEFI machine on wired Ethernet, a USB stick, a Tailscale acco
 
 | | |
 | --- | --- |
-| Setup | [install](docs/setup/install.md), [Tailscale SSH](docs/setup/tailscale-ssh.md), [runner](docs/setup/runner.md) |
+| Setup | [install](docs/setup/install.md), [Tailscale SSH](docs/setup/tailscale-ssh.md), [runner](docs/setup/runner.md), [ISO build host](docs/setup/iso-build-host.md) |
 | Operations | [updates and rollback](docs/operations/updates.md), [recovery](docs/operations/recovery.md) |
 | Reference | [security](docs/security.md), [glossary](CONTEXT.md), [decisions](docs/adr/), [contributing](CONTRIBUTING.md) |
 
