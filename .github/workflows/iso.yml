@@ -24,7 +24,10 @@ jobs:
     # The org's self-hosted runners (ADR 0008). Assumes x86_64 Linux with
     # podman and passwordless sudo; image-builder runs from its container as
     # root. Unproven until the first run, see issue #28.
-    runs-on: deathstar
+    # `deathstar` is a runner group, not a label; X64 keeps the arm64 runners out.
+    runs-on:
+      group: deathstar
+      labels: [Linux, X64]
     timeout-minutes: 120
     # Holds COSIGN_PRIVATE_KEY and COSIGN_PASSWORD (ADR 0003).
     environment: release
