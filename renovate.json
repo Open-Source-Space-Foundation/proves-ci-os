@@ -29,6 +29,14 @@
   ],
   "customManagers": [
     {
+      "description": "image-builder container used by make iso (ADR 0008).",
+      "customType": "regex",
+      "managerFilePatterns": ["/(^|/)Makefile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nIMAGE_BUILDER_IMAGE \\?= \\S+?:(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:\\S+)"
+      ]
+    },
+    {
       "description": "Raspberry Pi OpenOCD fork ref (ADR 0007).",
       "customType": "regex",
       "managerFilePatterns": ["/(^|/)Containerfile$/"],

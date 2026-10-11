@@ -27,12 +27,20 @@ check-renovate: ## Assert every pinned ARG has one manager and validate renovate
 	renovate-config-validator --strict
 
 ISO_PAYLOAD ?= ghcr.io/open-source-space-foundation/proves-ci-os:latest
+# image-builder runs from its container so the build host needs only podman.
+# renovate: datasource=docker depName=ghcr.io/osbuild/image-builder-cli
+IMAGE_BUILDER_IMAGE ?= ghcr.io/osbuild/image-builder-cli:latest@sha256:572972c40aca8fae7568cfc11f242c3062f01584a327352a11ccfbc03bf087d2
 
-iso: ## Build the installer ISO into ./out (needs root, podman and image-builder; see ADR 0008)
+# The container reads the installer and payload images from the host's root container storage.
+iso: ## Build the installer ISO into ./out (needs root and podman; see ADR 0008)
+	mkdir -p out
 	podman build -t localhost/proves-ci-os-installer -f iso/Containerfile iso
 	podman pull $(ISO_PAYLOAD)
-	image-builder build --bootc-ref localhost/proves-ci-os-installer \
+	podman run --rm --privileged \
+		-v /var/lib/containers/storage:/var/lib/containers/storage \
+		-v $(CURDIR)/out:/output \
+		$(IMAGE_BUILDER_IMAGE) build --bootc-ref localhost/proves-ci-os-installer \
 		--bootc-installer-payload-ref $(ISO_PAYLOAD) --bootc-default-fs ext4 \
-		--output-dir out --output-name proves-ci-os-installer bootc-generic-iso
+		--output-dir /output --output-name proves-ci-os-installer bootc-generic-iso
 
 all: fmt build test structure-test check-renovate ## Everything except iso

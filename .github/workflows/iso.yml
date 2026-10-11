@@ -21,9 +21,9 @@ env:
 
 jobs:
   iso:
-    # The org's self-hosted runners (ADR 0008). Assumes Linux with podman,
-    # dnf and passwordless sudo; image-builder needs root. Unproven until the
-    # first run, see issue #28.
+    # The org's self-hosted runners (ADR 0008). Assumes x86_64 Linux with
+    # podman and passwordless sudo; image-builder runs from its container as
+    # root. Unproven until the first run, see issue #28.
     runs-on: deathstar
     timeout-minutes: 120
     # Holds COSIGN_PRIVATE_KEY and COSIGN_PASSWORD (ADR 0003).
@@ -41,8 +41,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
-      - name: Install image-builder
-        run: sudo dnf -y install image-builder
       # The ISO embeds this image, so embed only one that verifies against the baked key.
       - name: Verify the payload signature
         run: |
