@@ -8,7 +8,7 @@ An immutable operating system image whose only job is to be a dedicated CI machi
 The bootable, immutable OS artifact published by this repo. Installed on a CI machine and updated in place.
 
 **CI machine**:
-A physical x86_64 machine on wired Ethernet that runs the Image and does nothing except serve as a Runner host. Not a developer workstation.
+A physical x86_64 or aarch64 (Raspberry Pi 4 or 5) machine on wired Ethernet that runs the Image and does nothing except serve as a Runner host. Not a developer workstation.
 
 **Runner**:
 The GitHub Actions self-hosted runner service that starts on boot on a CI machine and picks up jobs for the Open-Source-Space-Foundation organization.
