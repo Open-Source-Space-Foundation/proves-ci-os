@@ -39,11 +39,25 @@ jobs:
       COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
       REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # The installer writes its job token into /etc/nix/nix.conf, where it goes stale on a
+      # persistent host; NIX_CONFIG is read after the file, so this run's token wins.
+      NIX_CONFIG: access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The runner is persistent: the installer refuses to run over an existing Nix
+      # (it will not overwrite /etc/bash.bashrc.backup-before-nix), so install only once.
+      - name: Detect Nix
+        id: nix
+        run: |
+          set -euo pipefail
+          if [ -x /nix/var/nix/profiles/default/bin/nix ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo /nix/var/nix/profiles/default/bin >> "$GITHUB_PATH"
+          fi
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        if: steps.nix.outputs.present != 'true'
       # The payload package is private. One auth file serves cosign (DOCKER_CONFIG) and
       # podman (REGISTRY_AUTH_FILE); it lives in the job's temp dir, not the host's home.
       - name: Log in to ghcr.io
