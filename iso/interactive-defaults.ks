@@ -10,5 +10,8 @@ timezone --utc UTC
 lang en_US.UTF-8
 keyboard us
 rootpw --lock
+# The Image already defines ops (sysusers.d, ADR 0005). Naming it here keeps Anaconda
+# from asking for a generic user's name; it should ask only for the password.
+user --name=ops --gecos="Shared ops account" --homedir=/var/home/ops --groups=wheel
 clearpart --all --initlabel
 reboot --eject
