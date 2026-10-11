@@ -45,9 +45,9 @@ jobs:
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       - run: nix develop -c make check-renovate
 
-  # One native build and test per architecture, no emulation (ADR 0009). The
-  # arm64 labels follow the runner's default ARM64 label; confirm against the
-  # deathstar group's arm runner.
+  # One native build and test per architecture on GitHub-hosted runners, no
+  # emulation (ADR 0009). The deathstar group's only runner is a macOS Mac mini,
+  # which cannot build the Image natively.
   build-and-test:
     needs: lint
     strategy:
@@ -59,9 +59,7 @@ jobs:
             runner: ubuntu-26.04
           - arch: arm64
             platform: linux/arm64
-            runner:
-              group: deathstar
-              labels: [ARM64]
+            runner: ubuntu-26.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     steps:
