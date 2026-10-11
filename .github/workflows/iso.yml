@@ -24,7 +24,10 @@ jobs:
     # The org's self-hosted runners (ADR 0008). Assumes x86_64 Linux with
     # podman and passwordless sudo; image-builder runs from its container as
     # root. Unproven until the first run, see issue #28.
-    runs-on: deathstar
+    # `deathstar` is a runner group, not a label; X64 keeps the arm64 runners out.
+    runs-on:
+      group: deathstar
+      labels: [Linux, X64]
     timeout-minutes: 120
     # Holds COSIGN_PRIVATE_KEY and COSIGN_PASSWORD (ADR 0003).
     environment: release
@@ -36,11 +39,35 @@ jobs:
       COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
       REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # The installer writes its job token into /etc/nix/nix.conf, where it goes stale on a
+      # persistent host; NIX_CONFIG is read after the file, so this run's token wins.
+      NIX_CONFIG: access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The runner is persistent: the installer refuses to run over an existing Nix
+      # (it will not overwrite /etc/bash.bashrc.backup-before-nix), so install only once.
+      - name: Detect Nix
+        id: nix
+        run: |
+          set -euo pipefail
+          if [ -x /nix/var/nix/profiles/default/bin/nix ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo /nix/var/nix/profiles/default/bin >> "$GITHUB_PATH"
+          fi
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        if: steps.nix.outputs.present != 'true'
+      # The payload package is private. One auth file serves cosign (DOCKER_CONFIG) and
+      # podman (REGISTRY_AUTH_FILE); it lives in the job's temp dir, not the host's home.
+      - name: Log in to ghcr.io
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/docker"
+          printf '%s' "$REGISTRY_TOKEN" | podman login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin --authfile "$RUNNER_TEMP/docker/config.json"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/docker" >> "$GITHUB_ENV"
+          echo "REGISTRY_AUTH_FILE=$RUNNER_TEMP/docker/config.json" >> "$GITHUB_ENV"
       # The ISO embeds this image, so embed only one that verifies against the baked key.
       - name: Verify the payload signature
         run: |
@@ -49,7 +76,7 @@ jobs:
       - name: Build the ISO
         run: |
           set -euo pipefail
-          sudo make iso
+          sudo env REGISTRY_AUTH_FILE="$REGISTRY_AUTH_FILE" make iso
           iso="$(ls out/proves-ci-os-installer*.iso)"
           test "$(echo "$iso" | wc -l)" -eq 1
           mv "$iso" out/proves-ci-os-installer.iso
