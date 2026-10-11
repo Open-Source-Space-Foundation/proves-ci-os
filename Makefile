@@ -2,6 +2,8 @@
 .PHONY: help fmt build test structure-test check-renovate iso all
 
 IMAGE ?= proves-ci-os:dev
+# Architecture of the Image to build and test: linux/amd64 or linux/arm64.
+PLATFORM ?= linux/amd64
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "%-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -10,14 +12,14 @@ fmt: ## Run every pre-commit hook on all files
 	pre-commit run --all-files
 
 build: ## Build the Image with podman (CI is the authoritative build)
-	podman build -t $(IMAGE) .
+	podman build --platform $(PLATFORM) -t $(IMAGE) .
 
 test: ## Run Go tests
 	go test ./...
 
 structure-test: ## Run container-structure-test against $(IMAGE) (loaded into docker)
 	podman save $(IMAGE) | docker load
-	container-structure-test test --image localhost/$(IMAGE) --platform linux/amd64 \
+	container-structure-test test --image localhost/$(IMAGE) --platform $(PLATFORM) \
 		$(foreach f,$(wildcard tests/structure/*.yaml),--config $(f))
 
 check-renovate: ## Assert every pinned ARG has one manager and validate renovate.json

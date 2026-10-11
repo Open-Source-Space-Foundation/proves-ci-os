@@ -29,4 +29,4 @@ You need an x86_64 UEFI machine on wired Ethernet, a USB stick, a Tailscale acco
 
 ## Scope
 
-x86_64 only for now. Raspberry Pi and aarch64 are tracked separately.
+The Image is published for x86_64 and aarch64. The installer ISO and Raspberry Pi boot are still x86_64 only until the Pi 4 boot is proven (ADR 0009).

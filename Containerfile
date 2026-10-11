@@ -9,11 +9,15 @@ ARG GOLANG_IMAGE=golang:1.27@sha256:e432b43af23a9328d56a7c499be0476810aa344acbcf
 ARG OPENOCD_REF=acff23ffd100479d6481a1155123774b79a990b9
 # renovate: datasource=git-refs depName=https://github.com/dj-on-github/korad_control
 ARG KORAD_CONTROL_REF=ed806d8
-# Runner seed tarball, x86_64 only for now (ADR 0004). The sha256 is from the
-# release notes and verified again at build time.
+# Runner seed tarballs, one per architecture (ADR 0004). Each sha256 is from
+# the release notes and verified again at build time. The two pairs are
+# separate pins so each has exactly one Renovate manager (ADR 0002).
 # renovate: datasource=github-releases depName=actions/runner
 ARG RUNNER_VERSION=2.338.0
 ARG RUNNER_SHA256=af4b794c1bc41d73d40535e3fe092a39f9679cd8d965954c2aca25a05ca41d32
+# renovate: datasource=github-releases depName=actions/runner
+ARG RUNNER_VERSION_ARM64=2.338.0
+ARG RUNNER_SHA256_ARM64=628b4a7258487b80c1d3c221095a7ded349f5ae0175fd3dfab708d07428f041b
 
 # Go toolchain lives only here; the final image gets the static binaries.
 FROM ${GOLANG_IMAGE} AS gobuild
@@ -23,13 +27,15 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 RUN CGO_ENABLED=0 go build -trimpath -o /out/ ./cmd/proves-runner ./cmd/proves-update
 
-# Build-only packages stay in this stage (ADR 0007).
+# Build-only packages stay in this stage (ADR 0007). `which` is listed because
+# fedora-bootc ships it on amd64 but not arm64, and the OpenOCD bootstrap needs it.
 FROM ${BASE_IMAGE} AS hil
 ARG OPENOCD_REF
 ARG KORAD_CONTROL_REF
 RUN dnf -y install --setopt=install_weak_deps=False \
       git gcc make autoconf automake libtool pkgconf-pkg-config texinfo \
       libusb1-devel hidapi-devel jimtcl-devel python3.13 \
+      which \
     && dnf clean all
 WORKDIR /build/openocd
 RUN git clone https://github.com/raspberrypi/openocd . \
@@ -51,11 +57,19 @@ RUN git clone https://github.com/dj-on-github/korad_control /usr/local/lib/korad
 
 # The runner seed: downloaded and verified here, copied into the final image.
 FROM ${BASE_IMAGE} AS seed
+ARG TARGETARCH
 ARG RUNNER_VERSION
 ARG RUNNER_SHA256
-RUN curl -fsSL --retry 3 --max-time 600 -o /runner.tar.gz \
-      "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" \
-    && echo "${RUNNER_SHA256}  /runner.tar.gz" > /runner.sha256 \
+ARG RUNNER_VERSION_ARM64
+ARG RUNNER_SHA256_ARM64
+RUN case "${TARGETARCH}" in \
+      amd64) arch=x64;   version="${RUNNER_VERSION}";       sha="${RUNNER_SHA256}" ;; \
+      arm64) arch=arm64; version="${RUNNER_VERSION_ARM64}"; sha="${RUNNER_SHA256_ARM64}" ;; \
+      *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSL --retry 3 --max-time 600 -o /runner.tar.gz \
+      "https://github.com/actions/runner/releases/download/v${version}/actions-runner-linux-${arch}-${version}.tar.gz" \
+    && echo "${sha}  /runner.tar.gz" > /runner.sha256 \
     && sha256sum -c /runner.sha256
 
 FROM ${BASE_IMAGE}

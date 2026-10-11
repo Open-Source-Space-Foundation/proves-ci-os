@@ -45,9 +45,24 @@ jobs:
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       - run: nix develop -c make check-renovate
 
+  # One native build and test per architecture, no emulation (ADR 0009). The
+  # arm64 labels follow the runner's default ARM64 label; confirm against the
+  # deathstar group's arm runner.
   build-and-test:
     needs: lint
-    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-26.04
+          - arch: arm64
+            platform: linux/arm64
+            runner:
+              group: deathstar
+              labels: [ARM64]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -55,8 +70,8 @@ jobs:
           persist-credentials: false
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       - run: nix develop -c make test
-      - run: make build IMAGE=proves-ci-os:ci
-      - run: nix develop -c make structure-test IMAGE=proves-ci-os:ci
+      - run: make build PLATFORM=${{ matrix.platform }} IMAGE=proves-ci-os:ci
+      - run: nix develop -c make structure-test PLATFORM=${{ matrix.platform }} IMAGE=proves-ci-os:ci
       # Publish the exact image that passed the tests, not a rebuild.
       - name: Save the tested image
         if: github.event_name != 'pull_request'
@@ -64,7 +79,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name != 'pull_request'
         with:
-          name: image
+          name: image-${{ matrix.arch }}
           path: ${{ runner.temp }}/image.tar
           retention-days: 1
           compression-level: 0
@@ -90,40 +105,66 @@ jobs:
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: image
-          path: ${{ runner.temp }}
-      - name: Push by sha
+          pattern: image-*
+          path: ${{ runner.temp }}/images
+      # Each tested per-arch image goes up by sha, then one index ties them
+      # together. The index is what machines pull; its digest is what is signed.
+      - name: Push by sha and assemble the index
         run: |
           set -euo pipefail
-          # One auth file for skopeo and cosign (cosign reads $DOCKER_CONFIG/config.json).
+          # One auth file for skopeo, cosign and docker (cosign reads $DOCKER_CONFIG/config.json).
           mkdir -p "$RUNNER_TEMP/docker"
           authfile="$RUNNER_TEMP/docker/config.json"
           echo "DOCKER_CONFIG=$RUNNER_TEMP/docker" >> "$GITHUB_ENV"
           printf '%s' "$REGISTRY_TOKEN" | nix develop -c skopeo login ghcr.io \
             --username "$GITHUB_ACTOR" --password-stdin --authfile "$authfile"
-          nix develop -c skopeo copy --digestfile "$RUNNER_TEMP/digest" --authfile "$authfile" \
-            "oci-archive:$RUNNER_TEMP/image.tar" "docker://$IMAGE_REPO:$GITHUB_SHA"
-          test -s "$RUNNER_TEMP/digest"
-          echo "IMAGE_DIGEST=$(cat "$RUNNER_TEMP/digest")" >> "$GITHUB_ENV"
+          export DOCKER_CONFIG="$RUNNER_TEMP/docker"
+          arch_refs=()
+          arch_digests=()
+          for arch in amd64 arm64; do
+            nix develop -c skopeo copy --digestfile "$RUNNER_TEMP/digest-$arch" --authfile "$authfile" \
+              "oci-archive:$RUNNER_TEMP/images/image-$arch/image.tar" "docker://$IMAGE_REPO:$GITHUB_SHA-$arch"
+            test -s "$RUNNER_TEMP/digest-$arch"
+            arch_digests+=("$(cat "$RUNNER_TEMP/digest-$arch")")
+            arch_refs+=("$IMAGE_REPO@$(cat "$RUNNER_TEMP/digest-$arch")")
+          done
+          docker buildx imagetools create --tag "$IMAGE_REPO:$GITHUB_SHA" "${arch_refs[@]}"
+          nix develop -c skopeo inspect --raw --authfile "$authfile" "docker://$IMAGE_REPO:$GITHUB_SHA" \
+            > "$RUNNER_TEMP/index.json"
+          index_digest="$(nix develop -c skopeo manifest-digest "$RUNNER_TEMP/index.json")"
+          test -n "$index_digest"
+          {
+            echo "IMAGE_DIGEST=$index_digest"
+            echo "AMD64_DIGEST=${arch_digests[0]}"
+            echo "ARM64_DIGEST=${arch_digests[1]}"
+          } >> "$GITHUB_ENV"
       # cosign v3 defaults (new bundle format, referrers) are not read by containers/image yet.
       # No transparency log: machines verify offline against the baked key.
+      # Sign the index and each per-arch manifest: whether the baked policy
+      # needs the index or the arch signature is not established, so both exist.
       - name: Sign by digest
         run: |
           set -euo pipefail
-          nix develop -c cosign sign --yes --key env://COSIGN_PRIVATE_KEY \
-            --new-bundle-format=false --use-signing-config=false --tlog-upload=false \
-            --registry-referrers-mode=legacy \
-            "$IMAGE_REPO@$IMAGE_DIGEST"
+          for digest in "$IMAGE_DIGEST" "$AMD64_DIGEST" "$ARM64_DIGEST"; do
+            nix develop -c cosign sign --yes --key env://COSIGN_PRIVATE_KEY \
+              --new-bundle-format=false --use-signing-config=false --tlog-upload=false \
+              --registry-referrers-mode=legacy \
+              "$IMAGE_REPO@$digest"
+          done
       - name: Verify with only the baked policy
         run: |
           set -euo pipefail
-          docker run --rm --entrypoint skopeo \
-            -v "$PWD/files/etc/containers/policy.json:/etc/containers/policy.json:ro" \
-            -v "$PWD/files/etc/containers/registries.d:/etc/containers/registries.d:ro" \
-            -v "$PWD/files/etc/pki/containers/proves-ci-os.pub:/etc/pki/containers/proves-ci-os.pub:ro" \
-            -v "$RUNNER_TEMP/docker/config.json:/auth.json:ro" \
-            "$SKOPEO_IMAGE" \
-            copy --authfile /auth.json "docker://$IMAGE_REPO@$IMAGE_DIGEST" dir:/tmp/verified
+          # dir: cannot hold an index, so verifying the index resolves it to the
+          # host arch; each arch digest is also pulled directly.
+          for digest in "$IMAGE_DIGEST" "$AMD64_DIGEST" "$ARM64_DIGEST"; do
+            docker run --rm --entrypoint skopeo \
+              -v "$PWD/files/etc/containers/policy.json:/etc/containers/policy.json:ro" \
+              -v "$PWD/files/etc/containers/registries.d:/etc/containers/registries.d:ro" \
+              -v "$PWD/files/etc/pki/containers/proves-ci-os.pub:/etc/pki/containers/proves-ci-os.pub:ro" \
+              -v "$RUNNER_TEMP/docker/config.json:/auth.json:ro" \
+              "$SKOPEO_IMAGE" \
+              copy --authfile /auth.json "docker://$IMAGE_REPO@$digest" dir:/tmp/verified
+          done
       # Only a signed and verified digest gets the moving tags.
       - name: Move latest and the date tag
         run: |

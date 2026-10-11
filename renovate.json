@@ -45,12 +45,21 @@
       ]
     },
     {
-      "description": "Runner seed tarball version and sha256 (ADR 0004).",
+      "description": "Runner seed tarball version and sha256, x86_64 (ADR 0004).",
       "customType": "regex",
       "extractVersionTemplate": "^v(?<version>.+)$",
       "managerFilePatterns": ["/(^|/)Containerfile$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG RUNNER_VERSION=(?<currentValue>\\S+)\\nARG RUNNER_SHA256=(?<currentDigest>\\S+)"
+      ]
+    },
+    {
+      "description": "Runner seed tarball version and sha256, aarch64 (ADR 0004).",
+      "customType": "regex",
+      "extractVersionTemplate": "^v(?<version>.+)$",
+      "managerFilePatterns": ["/(^|/)Containerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nARG RUNNER_VERSION_ARM64=(?<currentValue>\\S+)\\nARG RUNNER_SHA256_ARM64=(?<currentDigest>\\S+)"
       ]
     }
   ]
