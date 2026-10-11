@@ -46,6 +46,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Fail in seconds with a pointer, not minutes into the build. Host setup: docs/setup/iso-build-host.md
+      - name: Check the build host
+        run: |
+          set -euo pipefail
+          if ! sudo -n true; then
+            echo "::error::passwordless sudo is required; see docs/setup/iso-build-host.md"
+            exit 1
+          fi
+          # Ubuntu's AppArmor profile for bwrap strips the capabilities osbuild needs.
+          profiles=/sys/kernel/security/apparmor/profiles
+          if sudo test -r "$profiles" && sudo grep -q '^unpriv_bwrap (enforce)' "$profiles"; then
+            echo "::error::AppArmor enforces unpriv_bwrap, which blocks osbuild; see docs/setup/iso-build-host.md"
+            exit 1
+          fi
       # The runner is persistent: the installer refuses to run over an existing Nix
       # (it will not overwrite /etc/bash.bashrc.backup-before-nix), so install only once.
       - name: Detect Nix
