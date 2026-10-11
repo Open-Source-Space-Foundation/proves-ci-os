@@ -49,6 +49,7 @@ jobs:
   # emulation (ADR 0009). The deathstar group's only runner is a macOS Mac mini,
   # which cannot build the Image natively.
   build-and-test:
+    name: build-and-test (${{ matrix.platform }})
     needs: lint
     strategy:
       fail-fast: false
