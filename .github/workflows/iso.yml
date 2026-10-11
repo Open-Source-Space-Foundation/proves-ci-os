@@ -44,6 +44,16 @@ jobs:
         with:
           persist-credentials: false
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      # The payload package is private. One auth file serves cosign (DOCKER_CONFIG) and
+      # podman (REGISTRY_AUTH_FILE); it lives in the job's temp dir, not the host's home.
+      - name: Log in to ghcr.io
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/docker"
+          printf '%s' "$REGISTRY_TOKEN" | podman login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin --authfile "$RUNNER_TEMP/docker/config.json"
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/docker" >> "$GITHUB_ENV"
+          echo "REGISTRY_AUTH_FILE=$RUNNER_TEMP/docker/config.json" >> "$GITHUB_ENV"
       # The ISO embeds this image, so embed only one that verifies against the baked key.
       - name: Verify the payload signature
         run: |
@@ -52,7 +62,7 @@ jobs:
       - name: Build the ISO
         run: |
           set -euo pipefail
-          sudo make iso
+          sudo env REGISTRY_AUTH_FILE="$REGISTRY_AUTH_FILE" make iso
           iso="$(ls out/proves-ci-os-installer*.iso)"
           test "$(echo "$iso" | wc -l)" -eq 1
           mv "$iso" out/proves-ci-os-installer.iso
