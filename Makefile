@@ -34,7 +34,9 @@ IMAGE_BUILDER_IMAGE ?= ghcr.io/osbuild/image-builder-cli:latest@sha256:572972c40
 # The container reads the installer and payload images from the host's root container storage.
 iso: ## Build the installer ISO into ./out (needs root and podman; see ADR 0008)
 	mkdir -p out
-	podman build -t localhost/proves-ci-os-installer -f iso/Containerfile iso
+	# Host network: on a host that also runs Docker its FORWARD DROP policy cuts off podman's
+	# bridge, so dnf inside the build cannot resolve names.
+	podman build --network=host -t localhost/proves-ci-os-installer -f iso/Containerfile iso
 	podman pull $(ISO_PAYLOAD)
 	podman run --rm --privileged \
 		-v /var/lib/containers/storage:/var/lib/containers/storage \
