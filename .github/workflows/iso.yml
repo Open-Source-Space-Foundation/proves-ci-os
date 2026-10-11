@@ -90,8 +90,9 @@ jobs:
       - name: Sign the ISO
         run: |
           set -euo pipefail
+          # cosign v3 defaults to the new bundle format; keep a plain .sig (as the Image's signature does).
           nix develop -c cosign sign-blob --yes --key env://COSIGN_PRIVATE_KEY \
-            --tlog-upload=false --use-signing-config=false \
+            --new-bundle-format=false --tlog-upload=false --use-signing-config=false \
             --output-signature out/proves-ci-os-installer.iso.sig out/proves-ci-os-installer.iso
           nix develop -c cosign verify-blob --key cosign.pub --insecure-ignore-tlog=true \
             --signature out/proves-ci-os-installer.iso.sig out/proves-ci-os-installer.iso
