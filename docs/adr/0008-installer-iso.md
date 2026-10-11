@@ -17,3 +17,5 @@ The ISO is trusted by a published checksum plus a cosign signature on the file. 
 The mechanism is unproven. Research found that `image-builder` documents no `anaconda-iso` type for bootc images; `bootc-generic-iso` ignores the blueprint, and only the discouraged `bootc-installer` type accepts a baked kickstart. Whether the password, hostname and disk prompts work with the `bootc` kickstart command, the real ISO size and the bootloader landing on the target firmware need a spike. This ADR is updated to `accepted`, or superseded, when the spike finishes.
 
 Build half (issue #28): `iso/` and `.github/workflows/iso.yml` implement the `bootc-generic-iso` route with the kickstart in `interactive-defaults.ks`, which is on a deprecation path. The workflow has not yet run, so the ISO size, the prompt flow and the bootloader path are still unmeasured and the status stays `proposed`.
+
+`image-builder` runs from its container (`ghcr.io/osbuild/image-builder-cli`, digest-pinned and bumped by Renovate) so the build host needs only podman and root, and may be any distribution, such as the Ubuntu `deathstar` runner. This is also unproven until the first run.
