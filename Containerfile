@@ -3,7 +3,7 @@
 ARG BASE_IMAGE=quay.io/fedora/fedora-bootc:44@sha256:909342d834ed0140233a50ad09817d41610bf3d98f3c8ff9fe58e382c6d00441
 
 # renovate: datasource=docker depName=golang
-ARG GOLANG_IMAGE=golang:1.27@sha256:e432b43af23a9328d56a7c499be0476810aa344acbcf65fc7c455d4ff5a40602
+ARG GOLANG_IMAGE=golang:1.27@sha256:007a316059246276cb214df93950be77837545dc78007a73e0291a4963d5d3bf
 # Raspberry Pi OpenOCD fork, `git describe` sdk-2.2.0-2-gcd4873400 (ADR 0007).
 # renovate: datasource=git-refs depName=https://github.com/raspberrypi/openocd
 ARG OPENOCD_REF=acff23ffd100479d6481a1155123774b79a990b9
