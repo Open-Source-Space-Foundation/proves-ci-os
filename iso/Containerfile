@@ -3,7 +3,7 @@
 # container into the ISO's live root; it is not the Image that gets installed.
 # Adapted from the osbuild/image-builder "Generic ISO" example.
 # renovate: datasource=docker depName=quay.io/fedora/fedora-bootc
-FROM quay.io/fedora/fedora-bootc:44@sha256:ea70c130d55794252b081c606603c6d4405561f28ae642a83fe43b1872f82663
+FROM quay.io/fedora/fedora-bootc:44@sha256:5a3472162ba7781a01d249b9a56bc5a9b9fa01c08edae1f73c77dfa1e504e868
 
 RUN dnf -y install --setopt=install_weak_deps=False \
       anaconda anaconda-install-img-deps anaconda-dracut \
