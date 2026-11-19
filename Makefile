@@ -29,7 +29,7 @@ check-renovate: ## Assert every pinned ARG has one manager and validate renovate
 ISO_PAYLOAD ?= ghcr.io/open-source-space-foundation/proves-ci-os:latest
 # image-builder runs from its container so the build host needs only podman.
 # renovate: datasource=docker depName=ghcr.io/osbuild/image-builder-cli
-IMAGE_BUILDER_IMAGE ?= ghcr.io/osbuild/image-builder-cli:latest@sha256:f33fa06204ab382eed24979bc99e880b221fbded5a369a0f40ded881d649d392
+IMAGE_BUILDER_IMAGE ?= ghcr.io/osbuild/image-builder-cli:latest@sha256:51a037b27871b65c170dde80bbbee104528295a8f3ab0b7698b5ce3fb7a0bee8
 
 # The container reads the installer and payload images from the host's root container storage.
 iso: ## Build the installer ISO into ./out (needs root and podman; see ADR 0008)
