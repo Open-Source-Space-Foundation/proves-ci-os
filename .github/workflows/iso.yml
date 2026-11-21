@@ -56,7 +56,7 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
             echo /nix/var/nix/profiles/default/bin >> "$GITHUB_PATH"
           fi
-      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
+      - uses: cachix/install-nix-action@bb0495a1086c46893eee56f32fd192dfe4a15bb9 # v32.0.0
         if: steps.nix.outputs.present != 'true'
       # The payload package is private. One auth file serves cosign (DOCKER_CONFIG) and
       # podman (REGISTRY_AUTH_FILE); it lives in the job's temp dir, not the host's home.
