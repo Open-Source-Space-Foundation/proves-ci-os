@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 # renovate: datasource=docker depName=quay.io/fedora/fedora-bootc
-ARG BASE_IMAGE=quay.io/fedora/fedora-bootc:44@sha256:6b32624945390e1022d779bf36275d6002ce7cc5d355b39b1efc02d054f73886
+ARG BASE_IMAGE=quay.io/fedora/fedora-bootc:44@sha256:830ad08e1579ff8a23ea4a41298aa9ab2fc195373fcb68ca85f5d2553e26b74d
 
 # renovate: datasource=docker depName=golang
 ARG GOLANG_IMAGE=golang:1.27@sha256:5f1b98fa02fe396ebce2a0227a0e08309e11792915b9dd2e1f71053d7e7e6666
